@@ -1,41 +1,39 @@
-
-import sys
 import random
 import os
-from random import seed
 from random import randint
 from graph_gen import *
 from dfg_gnn_attributes_generator import *
 from dfg import DFGGraph, Vertex
 from tqdm import tqdm
-import signal
 import argparse
 
-enable_cgra_me = False
-enable_morpher = True
+enable_cgra_me = True
+enable_morpher = False
+
 
 def myHandler(signum, frame):
     raise Exception("TimeoutError")
 
 
-def dump_cgra_me_graph(dir, graph: DFGGraph) :
+def dump_cgra_me_graph(dir, graph: DFGGraph):
     graph_name = graph.name
 
-    with open(os.path.join(dir, "cgra_me", graph_name+".dot"), "w") as f:
+    with open(os.path.join(dir, "cgra_me", graph_name + ".dot"), "w") as f:
         f.write("digraph G { \n")
         f.write(graph.cgrame_toStr())
         f.write("}\n")
-    
+
     return True
 
-def dump_morpher_graph(dir, graph: DFGGraph) :
+
+def dump_morpher_graph(dir, graph: DFGGraph):
     graph_name = graph.name
 
-    with open(os.path.join(dir, "morpher", graph_name+".xml"), "w") as f:
+    with open(os.path.join(dir, "morpher", graph_name + ".xml"), "w") as f:
         f.write(graph.morpher_toStr())
-    
+
     return True
-    
+
 
 def single_dfg_gen(dir, i):
     """
@@ -46,15 +44,15 @@ def single_dfg_gen(dir, i):
 
     number_node = random.choice(range(MIN_NODE, MAX_NODE))
     # print("i", "number of node", number_node)
-    min_edge = 2 # for each node
-    max_edge =  randint(3, 4) # for each node
+    min_edge = 2  # for each node
+    max_edge = randint(3, 4)  # for each node
     edge_dic = dfg_json_maker(str(1), 0, 0, number_node, min_edge, max_edge, 0, 1, 2, 1)
 
     graph = DFGGraph(str(i))
     for num in range(number_node):
-        graph.add_vertex(Vertex(id=str(num+1)))
+        graph.add_vertex(Vertex(id=str(num + 1)))
 
-    for key,values in edge_dic.items():
+    for key, values in edge_dic.items():
         for value in values:
             graph.add_edge(key, value)
 
@@ -72,18 +70,20 @@ def single_dfg_gen(dir, i):
             # print("did not generate", i)
             return False
     else:
-        assert(False)
+        assert False
 
     if not graph.check_connectivity():
-        # 
+        #
         return False
     new_node_number = len(graph.vertices.keys())
-    #if node_number != new_node_number:
-        #add somework to handle it
+    # if node_number != new_node_number:
+    # add somework to handle it
     graph.make_node_index_continous(node_number)
 
     if enable_morpher:
         graph.assign_morpher_op_code()
+    elif enable_cgra_me:
+        graph.assign_cgra_me_op_code()
 
     # try:
     #     signal.signal(signal.SIGALRM, myHandler)
@@ -105,13 +105,13 @@ def single_dfg_gen(dir, i):
 
     if len(graph.vertices) == 0:
         return False
-        
+
     # save graph info
     # Because graph in torch geometric counts vertices from 0, all generated nodes id will -1.
-    with open(os.path.join(dir, "graph", str(i)+".txt"), "w") as f:
+    with open(os.path.join(dir, "graph", str(i) + ".txt"), "w") as f:
         for edge in graph.edges:
             start_node, end_node = edge
-            f.write(str(start_node)+'\t'+str(end_node)+'\n')
+            f.write(str(start_node) + "\t" + str(end_node) + "\n")
 
     if enable_cgra_me:
         dump_cgra_me_graph(dir, graph)
@@ -119,21 +119,23 @@ def single_dfg_gen(dir, i):
         dump_morpher_graph(dir, graph)
 
     # save tag info
-    with open(os.path.join(dir, "graph", str(i)+"_feature.txt"), "w") as f:
+    with open(os.path.join(dir, "graph", str(i) + "_feature.txt"), "w") as f:
+        if asap_value is None:
+            return
         for idx in range(len(asap_value)):
-            f.write(str(asap_value[idx])+'\n')
+            f.write(str(asap_value[idx]) + "\n")
 
-    with open(os.path.join(dir, "graph", str(i)+"_op.txt"), "w") as f:
+    with open(os.path.join(dir, "graph", str(i) + "_op.txt"), "w") as f:
         for idx in range(len(asap_value)):
-            f.write(str(graph.vertices[idx].opcode)+'\n')
+            f.write(str(graph.vertices[idx].opcode) + "\n")
 
     return True
 
-def generator(n_data, dir, model, satrt_index = 0):
+
+def generator(n_data, dir, model, satrt_index=0):
     """
     n_data: long, number of graphs as training data set
     """
-    
 
     if not os.path.exists(dir):
         os.makedirs(dir, exist_ok=True)
@@ -151,12 +153,23 @@ def generator(n_data, dir, model, satrt_index = 0):
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='Process dfg_generator parameter.')
-    parser.add_argument("-s", "--start_index", default=0, type=int, help="the start index of graph")
-    parser.add_argument("-n", "--graph_num",default=100, type=int, help="the number of generated graphes")
-    parser.add_argument("-d", "--directory",default="morpher", help="the directory of generated graphes")
-
+    parser = argparse.ArgumentParser(description="Process dfg_generator parameter.")
+    parser.add_argument(
+        "-s", "--start_index", default=0, type=int, help="the start index of graph"
+    )
+    parser.add_argument(
+        "-n",
+        "--graph_num",
+        default=100,
+        type=int,
+        help="the number of generated graphes",
+    )
+    parser.add_argument(
+        "-d",
+        "--directory",
+        default="datasets",
+        help="the directory of generated graphes",
+    )
 
     args = parser.parse_args()
     # print(args.accumulate(args.integers))
@@ -166,8 +179,17 @@ if __name__ == "__main__":
 
     # assert(False)
 
-    generator(args.graph_num, "../data/"+args.directory, model = args.directory, satrt_index = args.start_index)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(script_dir)
+    data_dir = os.path.join(repo_root, "data", args.directory)
 
-    transform_graph_by_dir("data/" + str(args.directory), "graph", "transformered_graph")
+    model = "morpher" if enable_morpher else "cgra_me"
 
-    
+    generator(
+        args.graph_num,
+        data_dir,
+        model=model,
+        satrt_index=args.start_index,
+    )
+
+    transform_graph_by_dir(data_dir, "graph", "graph")

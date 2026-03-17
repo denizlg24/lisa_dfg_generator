@@ -117,7 +117,7 @@ def filesize(fileaddr):  # pragma: no cover
     """
     file_info = os.stat(fileaddr)
     file_size = file_info.st_size
-    print("Graph File Size : " + convert_bytes(file_size))
+    print(f"Graph File Size : {convert_bytes(file_size)}")
 
 
 def logger(vertices_number, edge_number, file_name, elapsed_time):
