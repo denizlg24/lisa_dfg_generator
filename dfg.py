@@ -771,7 +771,7 @@ class DFGGraph:
             if len(self.succ[node_id]) != 0 and len(self.pred[node_id]) != 0:
                 if len(self.pred[node_id]) == 1:
                     load_node_num += 1
-        if float(load_node_num) / node_num > 0.25:
+        if float(load_node_num) / node_num > 0.1:
             return False
 
         # check store number
@@ -780,7 +780,7 @@ class DFGGraph:
             if len(self.succ[node_id]) == 0:
                 if len(self.pred[node_id]) == 2:
                     store_node_num += 1
-        if float(store_node_num) / node_num > 0.15:
+        if float(store_node_num) / node_num > 0.1:
             return False
 
         # check output number
@@ -789,7 +789,7 @@ class DFGGraph:
             if len(self.succ[node_id]) == 0:
                 if len(self.pred[node_id]) == 1:
                     output_node_num += 1
-        if float(output_node_num) / node_num > 0.15:
+        if float(output_node_num) / node_num > 0.2:
             return False
 
         return True
