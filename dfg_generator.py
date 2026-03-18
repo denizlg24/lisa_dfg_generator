@@ -146,10 +146,18 @@ def generator(n_data, dir, model, satrt_index=0):
     # if not os.path.exists(os.path.join(dir, "label")):
     #     os.mkdir(os.path.join(dir, "label"))
 
+    total_attempts = 0
     for i in tqdm(range(satrt_index, n_data + satrt_index)):
+        attempts = 0
         while True:
+            attempts += 1
+            total_attempts += 1
             if single_dfg_gen(dir, i):
                 break
+        if attempts > 1:
+            tqdm.write(f"graph {i}: {attempts} attempts")
+    avg = total_attempts / max(n_data, 1)
+    print(f"generation done: {total_attempts} total attempts for {n_data} graphs (avg {avg:.1f} per graph)")
 
 
 if __name__ == "__main__":

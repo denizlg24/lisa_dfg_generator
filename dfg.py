@@ -710,6 +710,127 @@ class DFGGraph:
         self.set_no_ancestor()
 
     # below is for cgra-me
+    def _get_descendants(self, node):
+        descendants = set()
+        stack = list(self.succ[node])
+        while stack:
+            n = stack.pop()
+            if n not in descendants:
+                descendants.add(n)
+                stack.extend(self.succ[n])
+        return descendants
+
+    def _get_ancestors(self, node):
+        ancestors = set()
+        stack = list(self.pred[node])
+        while stack:
+            n = stack.pop()
+            if n not in ancestors:
+                ancestors.add(n)
+                stack.extend(self.pred[n])
+        return ancestors
+
+    def _classify_nodes(self):
+        loads = []
+        stores = []
+        outputs = []
+        for nid in self.vertices:
+            n_pred = len(self.pred[nid])
+            has_succ = len(self.succ[nid]) > 0
+            if n_pred == 1 and has_succ:
+                loads.append(nid)
+            elif n_pred == 2 and not has_succ:
+                stores.append(nid)
+            elif n_pred == 1 and not has_succ:
+                outputs.append(nid)
+        return loads, stores, outputs
+
+    def _repair_excess_loads(self, loads, max_count):
+        if len(loads) <= max_count:
+            return
+        excess = list(loads[max_count:])
+        random.shuffle(excess)
+        for nid in excess:
+            descendants = self._get_descendants(nid)
+            candidates = [
+                n for n in self.vertices
+                if n != nid
+                and n not in descendants
+                and n not in self.pred[nid]
+                and len(self.succ[n]) > 0
+            ]
+            if not candidates:
+                candidates = [
+                    n for n in self.vertices
+                    if n != nid
+                    and n not in descendants
+                    and n not in self.pred[nid]
+                ]
+            if candidates:
+                new_pred = random.choice(candidates)
+                self.edges.add((new_pred, nid))
+                self.pred[nid].add(new_pred)
+                self.succ[new_pred].add(nid)
+
+    def _repair_excess_stores(self, stores, max_count):
+        if len(stores) <= max_count:
+            return
+        excess = list(stores[max_count:])
+        random.shuffle(excess)
+        for nid in excess:
+            ancestors = self._get_ancestors(nid)
+            candidates = [
+                n for n in self.vertices
+                if n != nid
+                and n not in ancestors
+                and n not in self.succ[nid]
+                and len(self.pred[n]) < 2
+                and len(self.succ[n]) > 0
+            ]
+            if candidates:
+                target = random.choice(candidates)
+                self.edges.add((nid, target))
+                self.succ[nid].add(target)
+                self.pred[target].add(nid)
+
+    def _repair_excess_outputs(self, outputs, max_count):
+        if len(outputs) <= max_count:
+            return
+        node_num = len(self.vertices)
+        max_store_count = int(0.1 * node_num)
+        _, current_stores, _ = self._classify_nodes()
+        store_budget = max_store_count - len(current_stores)
+
+        excess = list(outputs[max_count:])
+        random.shuffle(excess)
+        for nid in excess:
+            if nid not in self.vertices:
+                continue
+            if store_budget > 0:
+                candidates = [
+                    n for n in self.vertices
+                    if n != nid and n not in self.pred[nid]
+                ]
+                if candidates:
+                    new_pred = random.choice(candidates)
+                    self.edges.add((new_pred, nid))
+                    self.pred[nid].add(new_pred)
+                    self.succ[new_pred].add(nid)
+                    store_budget -= 1
+                    continue
+            for p in list(self.pred[nid]):
+                self.succ[p].discard(nid)
+                self.edges.discard((p, nid))
+            del self.vertices[nid]
+            del self.pred[nid]
+            del self.succ[nid]
+
+        for k in list(self.vertices.keys()):
+            if len(self.succ[k]) == 0 and len(self.pred[k]) == 0:
+                del self.vertices[k]
+                del self.pred[k]
+                del self.succ[k]
+
     def satisfy_cgra_me_constraint(self):
         # the number of input  node must be less or equal to 2
         # print("satisfy_cgra_me_constraint")
@@ -762,34 +883,31 @@ class DFGGraph:
                 del self.pred[k]
                 del self.succ[k]
 
-        # check load number
         node_num = len(self.vertices.keys())
         if node_num == 0:
             return False
-        load_node_num = 0
-        for node_id in self.vertices.keys():
-            if len(self.succ[node_id]) != 0 and len(self.pred[node_id]) != 0:
-                if len(self.pred[node_id]) == 1:
-                    load_node_num += 1
-        if float(load_node_num) / node_num > 0.1:
-            return False
 
-        # check store number
-        store_node_num = 0
-        for node_id in self.vertices.keys():
-            if len(self.succ[node_id]) == 0:
-                if len(self.pred[node_id]) == 2:
-                    store_node_num += 1
-        if float(store_node_num) / node_num > 0.1:
-            return False
+        max_loads = int(0.1 * node_num)
+        max_stores = int(0.1 * node_num)
+        max_outputs = int(0.2 * node_num)
 
-        # check output number
-        output_node_num = 0
-        for node_id in self.vertices.keys():
-            if len(self.succ[node_id]) == 0:
-                if len(self.pred[node_id]) == 1:
-                    output_node_num += 1
-        if float(output_node_num) / node_num > 0.2:
+        loads, stores, outputs = self._classify_nodes()
+
+        self._repair_excess_loads(loads, max_loads)
+        self._repair_excess_stores(stores, max_stores)
+
+        loads, stores, outputs = self._classify_nodes()
+        self._repair_excess_outputs(outputs, max_outputs)
+
+        node_num = len(self.vertices.keys())
+        if node_num == 0:
+            return False
+        loads, stores, outputs = self._classify_nodes()
+        if float(len(loads)) / node_num > 0.1:
+            return False
+        if float(len(stores)) / node_num > 0.1:
+            return False
+        if float(len(outputs)) / node_num > 0.2:
             return False
 
         return True
