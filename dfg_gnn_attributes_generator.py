@@ -33,10 +33,12 @@ def transform_single_graph(graph_filename, graph_path, new_graph_path):
 
     # save graph info
     # Because graph in torch geometric counts vertices from 0, all generated nodes id will -1.
+    # Filter out self-loops as they are not valid for GNN processing
     with open(os.path.join(new_graph_path, str(graph_id) + ".txt"), "w") as f:
         for edge in graph.edges:
             start_node, end_node = edge
-            f.write(str(start_node) + "\t" + str(end_node) + "\n")
+            if start_node != end_node:  # Skip self-loops
+                f.write(str(start_node) + "\t" + str(end_node) + "\n")
 
     # save tag info
     with open(os.path.join(new_graph_path, str(graph_id) + "_feature.txt"), "w") as f:

@@ -302,7 +302,10 @@ class DFGGraph:
         asap_value = {}
         non_scheduled = set()
 
-        temp_pred = self.pred.copy()
+        # Deep copy pred and filter out self-loops (node cannot depend on itself for ASAP)
+        temp_pred = {
+            node: {p for p in preds if p != node} for node, preds in self.pred.items()
+        }
         for node in self.vertices:
             non_scheduled.add(node)
 
@@ -753,7 +756,8 @@ class DFGGraph:
         for nid in excess:
             descendants = self._get_descendants(nid)
             candidates = [
-                n for n in self.vertices
+                n
+                for n in self.vertices
                 if n != nid
                 and n not in descendants
                 and n not in self.pred[nid]
@@ -761,10 +765,9 @@ class DFGGraph:
             ]
             if not candidates:
                 candidates = [
-                    n for n in self.vertices
-                    if n != nid
-                    and n not in descendants
-                    and n not in self.pred[nid]
+                    n
+                    for n in self.vertices
+                    if n != nid and n not in descendants and n not in self.pred[nid]
                 ]
             if candidates:
                 new_pred = random.choice(candidates)
@@ -780,7 +783,8 @@ class DFGGraph:
         for nid in excess:
             ancestors = self._get_ancestors(nid)
             candidates = [
-                n for n in self.vertices
+                n
+                for n in self.vertices
                 if n != nid
                 and n not in ancestors
                 and n not in self.succ[nid]
@@ -808,8 +812,7 @@ class DFGGraph:
                 continue
             if store_budget > 0:
                 candidates = [
-                    n for n in self.vertices
-                    if n != nid and n not in self.pred[nid]
+                    n for n in self.vertices if n != nid and n not in self.pred[nid]
                 ]
                 if candidates:
                     new_pred = random.choice(candidates)
